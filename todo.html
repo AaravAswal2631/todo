@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            margin: 0;
+            padding: 0;
+            color: #fff;
+            overflow: hidden;
+            perspective: 1000px;
+        }
+        #canvas-container {
+            
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        .container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            z-index: 1;
+            text-align: center;
+        }
+        h1 {
+            text-align: center;
+            font-size: 36px;
+            color: #fff;
+            text-shadow: 0 0 20px #4f41ff;
+            animation: float 3s ease-in-out infinite;
+        }
+        .taskinput {
+            display: flex;
+            gap: 10px;
+            margin: 20px auto;
+            max-width: 500px;
+        }
+        .taskinput input {
+            flex: 1;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #4f41ff;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 18px;
+        }
+        .datetime-input {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #4f41ff;
+            border-radius: 10px;
+            color: #fff;
+            margin: 10px auto;
+            display: block;
+            width: calc(100% - 34px);
+        }
+        button {
+            padding: 15px 30px;
+            background: #4f41ff;
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .tasklist {
+            list-style: none;
+            padding: 0;
+            perspective: 2000px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .task-item {
+            background: rgba(79, 65, 255, 0.2);
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            transform-style: preserve-3d;
+            position: relative;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .task-content {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .timer {
+            font-size: 1.2em;
+            color: #4f41ff;
+            text-shadow: 0 0 10px rgba(79, 65, 255, 0.5);
+        }
+        .delete-btn {
+            background: #ff4141;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .task-deadline {
+            font-size: 0.9em;
+            color: #aaa;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        @keyframes addTask {
+            0% {
+                transform: translateZ(-1000px) rotateX(90deg);
+                opacity: 0;
+            }
+            100% {
+                transform: translateZ(0) rotateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes removeTask {
+            0% {
+                transform: translateZ(0) rotateX(0);
+                opacity: 1;
+            }
+            100% {
+                transform: translateZ(1000px) rotateX(-90deg);
+                opacity: 0;
+            }
+        }
+        .task-item.new { animation: addTask 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        .task-item.removing { animation: removeTask 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div class="container">
+        <h1>3D Todo List</h1>
+        <div class="taskinput">
+            <input type="text" id="taskInput" placeholder="Enter a task...">
+            <button onclick="addTask()">Add</button>
+        </div>
+        <input type="datetime-local" id="deadlineInput" class="datetime-input">
+        <ul id="taskList" class="tasklist"></ul>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js setup (same as before)
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Create animated background objects (same as before)
+        const cubes = [];
+        for(let i = 0; i < 50; i++) {
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x4f41ff,
+                transparent: true,
+                opacity: 0.3,
+                specular: 0xffffff
+            });
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(
+                (Math.random() - 0.5) * 20,
+                (Math.random() - 0.5) * 20,
+                (Math.random() - 0.5) * 20
+            );
+            cube.rotation.set(
+                Math.random() * Math.PI,
+                Math.random() * Math.PI,
+                Math.random() * Math.PI
+            );
+            cubes.push(cube);
+            scene.add(cube);
+        }
+
+        // Lights setup (same as before)
+        const light1 = new THREE.PointLight(0x4f41ff, 1, 100);
+        light1.position.set(10, 10, 10);
+        scene.add(light1);
+
+        const light2 = new THREE.PointLight(0xff41ff, 1, 100);
+        light2.position.set(-10, -10, -10);
+        scene.add(light2);
+
+        camera.position.z = 15;
+
+        // Animation loop (same as before)
+        function animate() {
+            requestAnimationFrame(animate);
+            cubes.forEach((cube, i) => {
+                cube.rotation.x += 0.01 * (i % 2 ? 1 : -1);
+                cube.rotation.y += 0.01 * (i % 3 ? 1 : -1);
+                cube.position.y += Math.sin(Date.now() * 0.001 + i) * 0.02;
+            });
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Enhanced task management with timers
+        function formatTimeRemaining(deadline) {
+            const now = new Date().getTime();
+            const distance = deadline - now;
+            
+            if (distance < 0) return "Time's up!";
+            
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+        }
+
+        function addTask() {
+            const input = document.getElementById('taskInput');
+            const deadlineInput = document.getElementById('deadlineInput');
+            const taskText = input.value.trim();
+            const deadline = new Date(deadlineInput.value).getTime();
+            
+            if (taskText && deadlineInput.value) {
+                const taskList = document.getElementById('taskList');
+                const li = document.createElement('li');
+                li.className = 'task-item new';
+                
+                const timerId = setInterval(() => {
+                    const timerSpan = li.querySelector('.timer');
+                    if (timerSpan) {
+                        timerSpan.textContent = formatTimeRemaining(deadline);
+                        if (new Date().getTime() > deadline) {
+                            timerSpan.style.color = '#ff4141';
+                        }
+                    }
+                }, 1000);
+                
+                li.innerHTML = `
+                    <div class="task-content">
+                        <span>${taskText}</span>
+                        <button class="delete-btn" onclick="removeTask(this.parentElement.parentElement, ${timerId})">Delete</button>
+                    </div>
+                    <span class="timer">${formatTimeRemaining(deadline)}</span>
+                    <span class="task-deadline">Due: ${new Date(deadline).toLocaleString()}</span>
+                `;
+                
+                taskList.appendChild(li);
+                input.value = '';
+                deadlineInput.value = '';
+
+                // Trigger 3D effect
+                cubes.forEach(cube => {
+                    cube.scale.set(1.5, 1.5, 1.5);
+                    setTimeout(() => {
+                        cube.scale.set(1, 1, 1);
+                    }, 300);
+                });
+            }
+        }
+
+        function removeTask(task, timerId) {
+            clearInterval(timerId);
+            task.classList.add('removing');
+            
+            // Trigger explosion effect
+            cubes.forEach(cube => {
+                const distance = 2;
+                cube.position.x += (Math.random() - 0.5) * distance;
+                cube.position.y += (Math.random() - 0.5) * distance;
+                cube.position.z += (Math.random() - 0.5) * distance;
+                
+                setTimeout(() => {
+                    cube.position.x -= (Math.random() - 0.5) * distance;
+                    cube.position.y -= (Math.random() - 0.5) * distance;
+                    cube.position.z -= (Math.random() - 0.5) * distance;
+                }, 500);
+            });
+            
+            setTimeout(() => task.remove(), 800);
+        }
+
+        // Event listeners
+        document.getElementById('taskInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTask();
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            cubes.forEach(cube => {
+                cube.rotation.x += mouseY * 0.01;
+                cube.rotation.y += mouseX * 0.01;
+            });
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
